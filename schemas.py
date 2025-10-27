@@ -23,7 +23,5 @@ class StatusResponse(BaseModel):
 
 class RefreshResponse(BaseModel):
     message: str
-    # countries_processed: int
-    # countries_updated: int
-    # countries_created: int
+    countries_stored: int
     last_refreshed_at: datetime

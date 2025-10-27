@@ -178,6 +178,9 @@ def fetch_countries(db: Session = Depends(get_db)):
             if countries_to_add:
                 db.bulk_insert_mappings(Country, countries_to_add)
             db.commit()
+
+            stored_count = db.query(Country).count()
+
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=500, detail={"error": "Internal Server Error"})
@@ -187,6 +190,7 @@ def fetch_countries(db: Session = Depends(get_db)):
 
         return RefreshResponse(
             message="Country data refreshed successfully",
+            countries_stored=stored_count,
             last_refreshed_at=last_refreshed_at
         )
 
