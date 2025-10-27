@@ -25,6 +25,13 @@ EXCHANGE_API = os.getenv("EXCHANGE_API")
 
 os.makedirs("cache", exist_ok=True)
 
+@app.get("/")
+@app.get("/kaithheathcheck")   
+@app.get("/kaithhealthcheck")
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "message": "Service is running"}
+
 def validate_country_data(country_data: dict[str, any]):
     errors = {}
     name = country_data.get("name")
@@ -108,11 +115,7 @@ def fetch_countries(db: Session = Depends(get_db)):
     
         last_refreshed_at = datetime.datetime.now(datetime.timezone.utc)
         
-        #trying to get the rates for each currency
-        if isinstance(exchange_data, dict) :
-            exchange_rates = exchange_data.get("rates", {})
-        else:
-            exchange_rates = {}
+        exchange_rates = exchange_data.get("rates", {}) if isinstance(exchange_data, dict) else {}
 
         countries_to_add = []
         
@@ -154,7 +157,7 @@ def fetch_countries(db: Session = Depends(get_db)):
 
                 
 
-                country_data = {
+                countries_to_add.append({
                     "name": name,
                     "capital": capital,
                     "region": region,
@@ -165,17 +168,14 @@ def fetch_countries(db: Session = Depends(get_db)):
                     "flag_url": flag_url,
                     "last_refreshed_at": last_refreshed_at
                 }
+                )
 
-                countries_to_add.append(country_data)
-            
             except Exception as e:
-                raise
+                continue
             
         
         db.query(Country).delete()
-
         db.bulk_insert_mappings(Country, countries_to_add)
-
         db.commit()
         
                 
@@ -183,13 +183,10 @@ def fetch_countries(db: Session = Depends(get_db)):
 
         return RefreshResponse(
             message="Country data refreshed successfully",
-            # countries_processed=len(countries_data),
-            # countries_updated=db.query(Country).filter(Country.last_refreshed_at == last_refreshed_at).count(),
-            # countries_created=db.query(Country).filter(Country.last_refreshed_at == last_refreshed_at).count(),
             last_refreshed_at=last_refreshed_at
         )
 
-    except HTTPException:
+    except HTTPException:  
         raise
     except Exception as e:
         # return str(e)
