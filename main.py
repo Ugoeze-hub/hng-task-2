@@ -12,8 +12,11 @@ import random
 import datetime
 from schemas import CountryResponse, StatusResponse, RefreshResponse
 from PIL import Image, ImageDraw, ImageFont
+import logging
 
 app = FastAPI()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 Base.metadata.create_all(bind=engine)
 
@@ -33,12 +36,6 @@ def validate_country_data(country_data: dict[str, any]):
         errors["population"] = "is required"
     elif not isinstance(population, int) or population < 0:
         errors["population"] = "must be a positive integer"
-
-    currencies = country_data.get("currencies")
-    if currencies is None:
-        errors["currencies"] = "is required"
-    elif not isinstance(currencies, list):
-        errors["currencies"] = "must be an array"
 
     if errors:
         raise HTTPException(
@@ -103,7 +100,7 @@ def fetch_countries(db: Session = Depends(get_db)):
             exchange_response = requests.get(EXCHANGE_API, timeout=10)
             exchange_response.raise_for_status()
             exchange_data = exchange_response.json()
-        except requests.exceptions.Timeout:
+        except requests.exceptions.RequestException:
             raise HTTPException(
                 status_code=503,
                 detail={"error": "External data source unavailable", "details": "Could not fetch data from Exchange API"}
@@ -118,7 +115,7 @@ def fetch_countries(db: Session = Depends(get_db)):
             exchange_rates = {}
 
         countries_to_add = []
-
+        
         for country in countries_data:
 
             try:
@@ -155,6 +152,7 @@ def fetch_countries(db: Session = Depends(get_db)):
                         if exchange_rate > 0.0 and population > 0:
                             estimated_gdp = (population * multiplier) / exchange_rate
 
+                
 
                 country_data = {
                     "name": name,
@@ -171,14 +169,15 @@ def fetch_countries(db: Session = Depends(get_db)):
                 countries_to_add.append(country_data)
             
             except Exception as e:
-                continue
+                raise
+            
         
-        if countries_to_add:
-            db.delete()
-            db.bulk_insert_mappings(Country, countries_to_add)
+        db.query(Country).delete()
+
+        db.bulk_insert_mappings(Country, countries_to_add)
 
         db.commit()
-
+        
                 
         generate_summary_image(db)
 
@@ -193,6 +192,7 @@ def fetch_countries(db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
+        # return str(e)
         db.rollback()
         raise HTTPException(
             status_code=500,
