@@ -117,7 +117,7 @@ def fetch_countries(db: Session = Depends(get_db)):
         else:
             exchange_rates = {}
 
-        countries_to_upsert = []
+        countries_to_add = []
 
         for country in countries_data:
 
@@ -154,7 +154,7 @@ def fetch_countries(db: Session = Depends(get_db)):
                         multiplier = random.uniform(1000, 2000)
                         if exchange_rate > 0.0 and population > 0:
                             estimated_gdp = (population * multiplier) / exchange_rate
-                    
+
 
                 country_data = {
                     "name": name,
@@ -168,33 +168,16 @@ def fetch_countries(db: Session = Depends(get_db)):
                     "last_refreshed_at": last_refreshed_at
                 }
 
-                countries_to_upsert.append(country_data)
-
+                countries_to_add.append(country_data)
+            
             except Exception as e:
                 continue
+        
+        if countries_to_add:
+            db.delete()
+            db.bulk_insert_mappings(Country, countries_to_add)
 
-        if countries_to_upsert:
-            
-            existing_countries = db.query(Country.name).all()
-            existing_country_names = {country.name.lower() for country in existing_countries}
-
-            countries_to_update = []
-            countries_to_create = []
-
-            for country_data in countries_to_upsert:
-                if country_data["name"].lower() in existing_country_names:
-                    countries_to_update.append(country_data)
-                else:
-                    countries_to_create.append(country_data)
-
-            if countries_to_create:
-                db.bulk_insert_mappings(Country, countries_to_create)
-
-            if countries_to_update:
-                for country_data in countries_to_update:
-                    db.query(Country).filter(Country.name.ilike(country_data["name"])).update(country_data)
-
-            db.commit()
+        db.commit()
 
                 
         generate_summary_image(db)
