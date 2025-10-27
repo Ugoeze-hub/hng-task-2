@@ -13,6 +13,8 @@ import datetime
 from schemas import CountryResponse, StatusResponse, RefreshResponse
 from PIL import Image, ImageDraw, ImageFont
 import logging
+import time
+startup_time = time.time()
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +32,8 @@ os.makedirs("cache", exist_ok=True)
 @app.get("/kaithhealthcheck")
 @app.get("/health")
 def health_check():
+    if time.time() - startup_time < 3:
+        return {"status": "starting", "message": "Application is starting up"}
     return {"status": "healthy", "message": "Service is running"}
 
 def validate_country_data(country_data: dict[str, any]):
