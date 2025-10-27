@@ -64,11 +64,6 @@ def generate_summary_image(db: Session):
         image = Image.new('RGB', (600, 400), color='white')#this is like my background
         draw = ImageDraw.Draw(image)#and this calls draw
 
-        #for my fonts
-        title_font = ImageFont.truetype("arial.ttf", 24) 
-        med_font = ImageFont.truetype("arial.ttf", 18)
-        small_font = ImageFont.truetype("arial.ttf", 14)
-
         draw.text((10, 10), f"Total Countries: {total_countries}", fill='black')
 
         draw.text((10, 40), "Top 5 Countries by Estimated GDP:", fill='black')
@@ -178,9 +173,14 @@ def fetch_countries(db: Session = Depends(get_db)):
                 continue
             
         
-        db.query(Country).delete()
-        db.bulk_insert_mappings(Country, countries_to_add)
-        db.commit()
+        try:
+            db.query(Country).delete()
+            if countries_to_add:
+                db.bulk_insert_mappings(Country, countries_to_add)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail={"error": "Internal Server Error"})
         
                 
         generate_summary_image(db)
@@ -220,9 +220,9 @@ def get_countries(region: Optional[str] = None, currency: Optional[str] = None, 
         query = db.query(Country)
 
         if region:
-            query = query.filter(Country.region.ilike(region))
+            query = query.filter(Country.region.ilike(f"%{region}%"))
         if currency:
-            query = query.filter(Country.currency_code.ilike(currency))
+            query = query.filter(Country.currency_code.ilike(f"%{currency}%"))
         if sort == "population_asc":
             query = query.order_by(Country.population.asc())
         elif sort == "population_desc":
@@ -249,6 +249,12 @@ def get_countries(region: Optional[str] = None, currency: Optional[str] = None, 
 
 @app.get("/countries/{country_name}", response_model=CountryResponse)
 def get_country(country_name: str, db: Session = Depends(get_db)):
+    if not country_name or not country_name.strip():
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Validation failed", "details": {"country_name": "is required"}}
+        )
+    
     country = db.query(Country).filter(Country.name.ilike(country_name)).first()
     if not country:
         raise HTTPException(status_code=404, detail={"error": "Country not found"})
@@ -270,6 +276,12 @@ def get_status(db: Session = Depends(get_db)):
 
 @app.delete("/countries/{country_name}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_country(country_name: str, db: Session = Depends(get_db)):
+    if not country_name or not country_name.strip():
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Validation failed", "details": {"country_name": "is required"}}
+        )
+    
     country = db.query(Country).filter(Country.name.ilike(country_name)).first()
     if not country:
         raise HTTPException(status_code=404, detail={"error": "Country not found"})
