@@ -89,10 +89,10 @@ def fetch_countries(db: Session = Depends(get_db)):
     try:
         #testing if the api link is working
         try:
-            countries_response = requests.get(COUNTRIES_API, timeout=30)
+            countries_response = requests.get(COUNTRIES_API, timeout=10)
             countries_response.raise_for_status()
             countries_data = countries_response.json()
-        except requests.exceptions.Timeout:
+        except requests.exceptions.RequestException:
             raise HTTPException(
                 status_code=503,
                 detail={"error": "External data source unavailable", "details": "Could not fetch data from Countries API"}
@@ -100,7 +100,7 @@ def fetch_countries(db: Session = Depends(get_db)):
         
         #testing if the exchange api link is working
         try:
-            exchange_response = requests.get(EXCHANGE_API, timeout=30)
+            exchange_response = requests.get(EXCHANGE_API, timeout=10)
             exchange_response.raise_for_status()
             exchange_data = exchange_response.json()
         except requests.exceptions.Timeout:
@@ -116,6 +116,8 @@ def fetch_countries(db: Session = Depends(get_db)):
             exchange_rates = exchange_data.get("rates", {})
         else:
             exchange_rates = {}
+
+        countries_to_upsert = []
 
         for country in countries_data:
 
@@ -153,38 +155,48 @@ def fetch_countries(db: Session = Depends(get_db)):
                         if exchange_rate > 0.0 and population > 0:
                             estimated_gdp = (population * multiplier) / exchange_rate
                     
-                existing_country = db.query(Country).filter(Country.name.ilike(name)).first()
 
-                if existing_country:
-                    #update te  existing country
-                    existing_country.capital = capital
-                    existing_country.region = region
-                    existing_country.population = population
-                    existing_country.currency_code = currency_code
-                    existing_country.exchange_rate = exchange_rate
-                    existing_country.estimated_gdp = estimated_gdp
-                    existing_country.flag_url = flag_url
-                    existing_country.last_refreshed_at = last_refreshed_at
-                else:
-                    #create new country
-                    new_country = Country(
-                        name=name,
-                        capital=capital,
-                        region=region,
-                        population=population,
-                        currency_code=currency_code,
-                        exchange_rate=exchange_rate,
-                        estimated_gdp=estimated_gdp,
-                        flag_url=flag_url,
-                        last_refreshed_at=last_refreshed_at
-                    )
-                    db.add(new_country)
+                country_data = {
+                    "name": name,
+                    "capital": capital,
+                    "region": region,
+                    "population": population,
+                    "currency_code": currency_code,
+                    "exchange_rate": exchange_rate,
+                    "estimated_gdp": estimated_gdp,
+                    "flag_url": flag_url,
+                    "last_refreshed_at": last_refreshed_at
+                }
+
+                countries_to_upsert.append(country_data)
 
             except Exception as e:
                 continue
 
-        db.commit()
+        if countries_to_upsert:
+            
+            existing_countries = db.query(Country.name).all()
+            existing_country_names = {country.name.lower() for country in existing_countries}
 
+            countries_to_update = []
+            countries_to_create = []
+
+            for country_data in countries_to_upsert:
+                if country_data["name"].lower() in existing_country_names:
+                    countries_to_update.append(country_data)
+                else:
+                    countries_to_create.append(country_data)
+
+            if countries_to_create:
+                db.bulk_insert_mappings(Country, countries_to_create)
+
+            if countries_to_update:
+                for country_data in countries_to_update:
+                    db.query(Country).filter(Country.name.ilike(country_data["name"])).update(country_data)
+
+            db.commit()
+
+                
         generate_summary_image(db)
 
         return RefreshResponse(
