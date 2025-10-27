@@ -89,10 +89,10 @@ def fetch_countries(db: Session = Depends(get_db)):
     try:
         #testing if the api link is working
         try:
-            countries_response = requests.get(COUNTRIES_API)
+            countries_response = requests.get(COUNTRIES_API, timeout=30)
             countries_response.raise_for_status()
             countries_data = countries_response.json()
-        except Exception as e:
+        except requests.exceptions.Timeout:
             raise HTTPException(
                 status_code=503,
                 detail={"error": "External data source unavailable", "details": "Could not fetch data from Countries API"}
@@ -100,10 +100,10 @@ def fetch_countries(db: Session = Depends(get_db)):
         
         #testing if the exchange api link is working
         try:
-            exchange_response = requests.get(EXCHANGE_API)
+            exchange_response = requests.get(EXCHANGE_API, timeout=30)
             exchange_response.raise_for_status()
             exchange_data = exchange_response.json()
-        except Exception as e:
+        except requests.exceptions.Timeout:
             raise HTTPException(
                 status_code=503,
                 detail={"error": "External data source unavailable", "details": "Could not fetch data from Exchange API"}
@@ -219,13 +219,14 @@ def get_summary_image():
 
 @app.get("/countries", response_model=List[CountryResponse])
 def get_countries(region: Optional[str] = None, currency: Optional[str] = None, sort: Optional[str] = None, db: Session = Depends(get_db)):
-    query = db.query(Country)
 
-    if region:
-        query = query.filter(Country.region.ilike(region))
-    if currency:
-        query = query.filter(Country.currency_code.ilike(currency))
-    if sort:
+    try:
+        query = db.query(Country)
+
+        if region:
+            query = query.filter(Country.region.ilike(region))
+        if currency:
+            query = query.filter(Country.currency_code.ilike(currency))
         if sort == "population_asc":
             query = query.order_by(Country.population.asc())
         elif sort == "population_desc":
@@ -234,10 +235,20 @@ def get_countries(region: Optional[str] = None, currency: Optional[str] = None, 
             query = query.order_by(Country.estimated_gdp.asc())
         elif sort == "gdp_desc":
             query = query.order_by(Country.estimated_gdp.desc())
-        
+        elif sort == "name_desc":
+            query = query.order_by(Country.name.desc())
+        else:
+            query = query.order_by(Country.name.asc())
 
-    countries = query.all()
-    return countries
+        countries = query.all()
+        return countries if countries else []
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Internal Server Error"}
+        )
+
 
 
 @app.get("/countries/{country_name}", response_model=CountryResponse)
