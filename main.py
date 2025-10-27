@@ -228,13 +228,14 @@ def get_countries(region: Optional[str] = None, currency: Optional[str] = None, 
         elif sort == "population_desc":
             query = query.order_by(Country.population.desc())
         elif sort == "gdp_asc":
-            query = query.order_by(Country.estimated_gdp.asc())
+            query = query.order_by(Country.estimated_gdp.asc().nulls_last())
         elif sort == "gdp_desc":
-            query = query.order_by(Country.estimated_gdp.desc())
+            query = query.order_by(Country.estimated_gdp.desc().nulls_last())
         elif sort == "name_desc":
             query = query.order_by(Country.name.desc())
         else:
             query = query.order_by(Country.name.asc())
+
 
         countries = query.all()
         return countries if countries else []
