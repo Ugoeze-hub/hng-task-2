@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -13,15 +13,29 @@ class CountryResponse(BaseModel):
     estimated_gdp: Optional[float] = None
     flag_url: Optional[str] = None
     last_refreshed_at: datetime
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_encoders={
+            datetime: lambda v: v.isoformat().replace('+00:00', 'Z')
+        }
+    )
+
     
-    class Config:
-        from_attributes = True
 
 class StatusResponse(BaseModel):
     total_countries: int
     last_refreshed_at: Optional[datetime] = None
 
+    model_config = ConfigDict(json_encoders={
+        datetime: lambda v: v.isoformat().replace('+00:00', 'Z')
+    })
+
 class RefreshResponse(BaseModel):
     message: str
     countries_stored: int
     last_refreshed_at: datetime
+
+    model_config = ConfigDict(json_encoders={
+        datetime: lambda v: v.isoformat().replace('+00:00', 'Z')
+    })

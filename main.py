@@ -191,7 +191,7 @@ def fetch_countries(db: Session = Depends(get_db)):
         generate_summary_image(db)
 
         return RefreshResponse(
-            message="Country data refreshed successfully",
+            message="Countries data refreshed successfully",
             countries_stored=stored_count,
             last_refreshed_at=last_refreshed_at
         )
