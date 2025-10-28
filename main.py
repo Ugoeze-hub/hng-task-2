@@ -20,6 +20,7 @@ app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 
 COUNTRIES_API = os.getenv("COUNTRIES_API")
@@ -58,7 +59,7 @@ def generate_summary_image(db: Session):
     try:
 
         total_countries = db.query(Country).count()
-        top_countries = db.query(Country).order_by(Country.estimated_gdp.desc()).limit(5).all()
+        top_countries = db.query(Country).filter(Country.estimated_gdp.isnot(None)).order_by(Country.estimated_gdp.desc()).limit(5).all()
         last_refreshed = db.query(Country).order_by(Country.last_refreshed_at.desc()).first()
 
         image = Image.new('RGB', (600, 400), color='white')#this is like my background
@@ -175,6 +176,7 @@ def fetch_countries(db: Session = Depends(get_db)):
         
         try:
             db.query(Country).delete()
+            db.commit()
             if countries_to_add:
                 db.bulk_insert_mappings(Country, countries_to_add)
             db.commit()
@@ -229,13 +231,13 @@ def get_countries(region: Optional[str] = None, currency: Optional[str] = None, 
             query = query.filter(Country.currency_code.ilike(f"%{currency}%"))
         if sort == "population_asc":
             query = query.order_by(Country.population.asc())
-        elif sort == "population_desc":
+        if sort == "population_desc":
             query = query.order_by(Country.population.desc())
-        elif sort == "gdp_asc":
-            query = query.order_by(Country.estimated_gdp.asc().nulls_last())
-        elif sort == "gdp_desc":
-            query = query.order_by(Country.estimated_gdp.desc().nulls_last())
-        elif sort == "name_desc":
+        if sort == "gdp_asc":
+            query = query.order_by(Country.estimated_gdp.nulls_last().asc())
+        if sort == "gdp_desc":
+            query = query.order_by(Country.estimated_gdp.nulls_last().desc())
+        if sort == "name_desc":
             query = query.order_by(Country.name.desc())
         else:
             query = query.order_by(Country.name.asc())
