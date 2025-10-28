@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 import models
 from models import Country, Base
 from database import get_db, engine
@@ -14,6 +14,8 @@ from schemas import CountryResponse, StatusResponse, RefreshResponse
 from PIL import Image, ImageDraw, ImageFont
 import logging
 import time
+import io
+
 startup_time = time.time()
 
 app = FastAPI()
@@ -25,8 +27,6 @@ Base.metadata.create_all(bind=engine)
 
 COUNTRIES_API = os.getenv("COUNTRIES_API")
 EXCHANGE_API = os.getenv("EXCHANGE_API")
-
-os.makedirs("cache", exist_ok=True)
 
 @app.get("/")
 @app.get("/kaithheathcheck")   
@@ -78,8 +78,11 @@ def generate_summary_image(db: Session):
         if last_refreshed:
             draw.text((20, 250), f"Last Refreshed At: {last_refreshed.last_refreshed_at.strftime('%Y-%m-%d %H:%M:%S')}", fill='black')
 
-        image.save("cache/summary.png")
-        return True
+        img_buffer = io.BytesIO()
+        image.save(img_buffer, format="PNG")
+        img_buffer.seek(0)
+
+        return img_buffer.getvalue()
     
     except Exception as e:
         print(f"Image generation failed: {e}") 
@@ -208,10 +211,14 @@ def fetch_countries(db: Session = Depends(get_db)):
     
 
 @app.get("/countries/image")
-def get_summary_image():
-    image_path = "cache/summary.png"
-    if os.path.exists(image_path):
-        return FileResponse(image_path, media_type="image/png", filename="summary.png")
+def get_summary_image(db: Session = Depends(get_db)):
+    img_bytes = generate_summary_image(db)
+    if img_bytes:
+        return Response(
+            content=img_bytes,
+            media_type="image/png",
+            headers={"Content-Disposition": "filename=summary.png"}
+        )
     else:
         raise HTTPException(
             status_code=404,
