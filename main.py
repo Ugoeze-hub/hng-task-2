@@ -20,7 +20,7 @@ app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-Base.metadata.drop_all(bind=engine)
+
 Base.metadata.create_all(bind=engine)
 
 COUNTRIES_API = os.getenv("COUNTRIES_API")
