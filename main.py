@@ -238,13 +238,13 @@ def get_countries(region: Optional[str] = None, currency: Optional[str] = None, 
             query = query.filter(Country.currency_code.ilike(f"%{currency}%"))
         if sort == "population_asc":
             query = query.order_by(Country.population.asc())
-        if sort == "population_desc":
+        elif sort == "population_desc":
             query = query.order_by(Country.population.desc())
-        if sort == "gdp_asc":
-            query = query.order_by(Country.estimated_gdp.nulls_last().asc())
-        if sort == "gdp_desc":
-            query = query.order_by(Country.estimated_gdp.nulls_last().desc())
-        if sort == "name_desc":
+        elif sort == "gdp_asc":
+            query = query.order_by(Country.estimated_gdp.asc())
+        elif sort == "gdp_desc":
+            query = query.order_by(Country.estimated_gdp.desc())
+        elif sort == "name_desc":
             query = query.order_by(Country.name.desc())
         else:
             query = query.order_by(Country.name.asc())
@@ -254,6 +254,7 @@ def get_countries(region: Optional[str] = None, currency: Optional[str] = None, 
         return countries if countries else []
     
     except Exception as e:
+        print(f"GET /countries error: {e}")
         raise HTTPException(
             status_code=500,
             detail={"error": "Internal Server Error"}
@@ -280,8 +281,6 @@ def get_status(db: Session = Depends(get_db)):
     last_refreshed_country = db.query(Country.last_refreshed_at).order_by(Country.last_refreshed_at.desc()).first()
     if last_refreshed_country:
         last_refreshed_at = last_refreshed_country.last_refreshed_at
-    else:
-        last_refreshed_at = None
 
     return StatusResponse(
         total_countries=total_countries,
