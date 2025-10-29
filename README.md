@@ -28,13 +28,20 @@ Image Generation: Pillow (PIL)
 HTTP Client: Requests
 
 # Setup Instructions
-## Prerequisites
+
+#### Prerequisites
 
 Python 3.8+
 
 MySQL database (Aiven recommended)
 
 Aiven account for MySQL hosting
+
+#### Clone
+#### Install requirements.txt
+#### Create your .env file
+#### Set up the database
+#### Run the application
 
 
 # Author
